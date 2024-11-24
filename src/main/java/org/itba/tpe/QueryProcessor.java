@@ -17,42 +17,24 @@ public class QueryProcessor {
     private String timestamp;
     private FileSystem fs;
 
-    public QueryProcessor(GraphFrame graphFrame, String directory, String timestamp, FileSystem fs) {
+    public QueryProcessor(GraphFrame graphFrame, Path path, String timestamp, FileSystem fs) {
         this.graph = graphFrame;
-        this.path = new Path(directory);
+        this.path = path;
         this.timestamp = timestamp;
         this.fs = fs;
     }
 
     public void query1() throws IOException {
-        Dataset<Row> queryEj1Bfs2 = graph.bfs()
-                .fromExpr("labelV = 'airport' AND code != 'SEA' AND lat < 0 AND lon < 0")
-                .edgeFilter("labelE = 'route'")
-                .toExpr("labelV = 'airport' AND code = 'SEA'")
-                .maxPathLength(2)
-                .run();
+        GraphFrame subgraph = graph.filterVertices("labelV = 'airport'").filterEdges("labelE = 'route'");
 
+        Dataset<Row> queryEj1 = subgraph.find("(a)-[r]->(b); (c)-[r2]->(d)")
+                .filter("a.code != 'SEA' AND a.lat < 0 AND a.lon < 0 " +
+                        "AND d.code = 'SEA' AND " +
+                        "(b.code = c.code OR (a.code = c.code AND b.code = d.code))")
+                .selectExpr("a.code AS from",
+                                   "CASE WHEN b.code = 'SEA' THEN 'No Stop' ELSE b.code END AS stop",
+                                   "d.code AS to");
 
-        queryEj1Bfs2.show();
-
-        boolean hasV1 = queryEj1Bfs2.columns().length > 0 && java.util.Arrays.asList(queryEj1Bfs2.columns()).contains("v1");
-
-        Dataset<Row> queryEj1;
-
-        if (hasV1)
-            queryEj1 = queryEj1Bfs2.selectExpr("from.code AS from",
-                    "CASE WHEN v1 IS NULL THEN 'No Stop' ELSE v1.code END AS stop", "to.code AS to");
-        else
-            queryEj1 = queryEj1Bfs2.selectExpr("from.code AS from", "'No Stop' AS stop", "to.code AS to");
-
-        queryEj1.show();
-
-        long sinEscalas = hasV1 ? queryEj1Bfs2.filter("v1 is null").count() : queryEj1Bfs2.count();
-        long conEscala = hasV1 ? queryEj1Bfs2.filter("v1 is not null").count() : 0;
-
-        System.out.printf("Sin escalas: %d\nCon escalas: %d\n", sinEscalas, conEscala);
-
-        System.out.println("Query ej B.1");
 
         queryEj1.show();
         JavaRDD<String> formattedRDD = queryEj1.javaRDD().map(row -> {
@@ -69,30 +51,20 @@ public class QueryProcessor {
     public void query2(SQLContext sqlContext) throws IOException {
         graph.triplets().createOrReplaceTempView("t_table");
 
-        Dataset<Row> queryEj2Interm = sqlContext.sql(
-                "    SELECT DISTINCT " +
-                        "        t2.src.desc AS continent, " +
-                        "        t.src.desc AS full_country, " +
-                        "        t.src.code AS country, " +
-                        "        INT(t.dst.elev) AS elev " +
-                        "    FROM t_table t " +
-                        "    INNER JOIN t_table t2 " +
-                        "        ON t.dst.code = t2.dst.code " +
-                        "    WHERE t.src.labelV = 'country' " +
-                        "      AND t.dst.labelV = 'airport' " +
-                        "      AND t2.src.labelV = 'continent' " +
-                        "      AND t2.dst.labelV = 'airport' " +
-                        "    ORDER BY elev "
-        );
-
-//        queryEj2Interm.show();
-        queryEj2Interm.createOrReplaceTempView("t1");
-
         Dataset<Row> queryEj2 = sqlContext.sql(
-                "SELECT continent, (country || ' (' || full_country || ')'), collect_list(elev) AS elevations " +
-                        "FROM t1 " +
-                        "GROUP BY continent, full_country, country " +
-                        "ORDER BY continent, country"
+                "SELECT " +
+                        "    t2.src.desc AS continent, " +
+                        "    (t.src.code || ' (' || t.src.desc || ')') AS country_info, " +
+                        "    sort_array(collect_list(t.dst.elev)) AS elevations " +
+                        "FROM t_table t " +
+                        "INNER JOIN t_table t2 " +
+                        "    ON t.dst.code = t2.dst.code " +
+                        "WHERE t.src.labelV = 'country' " +
+                        "  AND t.dst.labelV = 'airport' " +
+                        "  AND t2.src.labelV = 'continent' " +
+                        "  AND t2.dst.labelV = 'airport' " +
+                        "GROUP BY t2.src.desc, t.src.code, t.src.desc " +
+                        "ORDER BY t2.src.desc, t.src.code"
         );
 
         System.out.println("Query ej B.2");

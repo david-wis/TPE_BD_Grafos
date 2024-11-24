@@ -21,15 +21,18 @@ import java.util.List;
 public class GraphReader {
     private final Graph graph;
 
-    public GraphReader(String path, FileSystem fs) throws IOException {
+    public GraphReader(Path path, FileSystem fs) throws IOException {
         this.graph = new TinkerGraph();
-        try (FSDataInputStream fis = fs.open(new Path(path))) {
+        if (!fs.exists(path)) {
+            throw new IOException("File not found: " + path);
+        }
+        try (FSDataInputStream fis = fs.open(path)) {
             GraphMLReader reader = new GraphMLReader(graph);
             reader.inputGraph(fis);
         }
     }
 
-    public Dataset<Row> loadVertices(SQLContext sqlContext) throws IOException {
+    public Dataset<Row> loadVertices(SQLContext sqlContext) {
         List<Row> rows = new ArrayList<>();
         graph.getVertices().forEach(v -> {
             rows.add(RowFactory.create(

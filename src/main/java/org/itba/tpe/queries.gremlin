@@ -1,0 +1,6 @@
+a)
+graph.traversal().V().as('V1').hasLabel('airport').has('code', neq('SEA')).has('lat', lt(0)).has('lon', lt(0)).outE('route').inV().as('V2').hasLabel('airport').or(__.has('code', 'SEA'), __.outE('route').inV().hasLabel('airport').has('code', 'SEA')).path().map{ p -> def path = p.get(); def v1 = path.V1.values('code').next(); def v2 = path.V2.values('code').next(); v2.equals("SEA") ? v1 + " - " + "Sin escalas" + " - " + v2 : v1 + " - " + v2 + " - " + "SEA"  }
+
+b)
+graph.traversal().V().as('continent').hasLabel('continent').outE('contains').inV().as('a').inE('contains').outV().as('country').hasLabel('country').group().by(select('continent').values('desc')).by(group().by(select('country').valueMap('desc', 'code')).by(select('a').values('elev').order().fold())).unfold().unfold().map { def continent = it.get().key; def countries = it.get().value; countries.collect { country, elevations -> "${continent}\t${country['code'][0]} (${country['desc'][0]})\t[${elevations.join(', ')}]" }.join("\n") }.join("\n")
+
