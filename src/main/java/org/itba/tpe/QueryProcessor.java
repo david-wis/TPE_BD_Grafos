@@ -33,7 +33,8 @@ public class QueryProcessor {
                         "(b.code = c.code OR (a.code = c.code AND b.code = d.code))")
                 .selectExpr("a.code AS from",
                                    "CASE WHEN b.code = 'SEA' THEN 'No Stop' ELSE b.code END AS stop",
-                                   "d.code AS to");
+                                   "d.code AS to")
+                .distinct();
 
 
         queryEj1.show();
@@ -41,7 +42,7 @@ public class QueryProcessor {
             String origin = row.getString(0); // Origin
             String stop = row.getString(1); // Stop
             String destination = row.getString(2); // Destination
-            return String.format("%s\t%s\t%s", origin, stop, destination);
+            return String.format("%s %s %s", origin, stop, destination);
         });
 
         String fileName = timestamp + "-b1.txt";
@@ -64,7 +65,7 @@ public class QueryProcessor {
                         "  AND t2.src.labelV = 'continent' " +
                         "  AND t2.dst.labelV = 'airport' " +
                         "GROUP BY t2.src.desc, t.src.code, t.src.desc " +
-                        "ORDER BY t2.src.desc, t.src.code"
+                        "ORDER BY continent, country_info"
         );
 
         System.out.println("Query ej B.2");
@@ -75,7 +76,7 @@ public class QueryProcessor {
             String country = row.getString(1);   // Country Code
             List<Integer> elevations = row.getList(2); // List of elevations
             String elevationList = elevations.toString();
-            return String.format("%s\t%s\t%s", continent, country, elevationList);
+            return String.format("%s %s %s", continent, country, elevationList);
         });
 
         String fileName = timestamp + "-b2.txt";
