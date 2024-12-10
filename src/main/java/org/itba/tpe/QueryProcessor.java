@@ -29,7 +29,7 @@ public class QueryProcessor {
 
         Dataset<Row> queryEj1 = subgraph.find("(a)-[r]->(b); (c)-[r2]->(d)")
                 .filter("a.code != 'SEA' AND a.lat < 0 AND a.lon < 0 " +
-                        "AND d.code = 'SEA' AND " +
+                        "AND d.code = 'SEA' AND a.code != b.code AND " +
                         "(b.code = c.code OR (a.code = c.code AND b.code = d.code))")
                 .selectExpr("a.code AS from",
                                    "CASE WHEN b.code = 'SEA' THEN 'No Stop' ELSE b.code END AS stop",
